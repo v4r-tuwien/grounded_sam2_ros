@@ -8,11 +8,11 @@ from PIL import Image
 from torchvision.ops import box_convert
 import bisect
 
-import grounding_dino.groundingdino.datasets.transforms as T
-from grounding_dino.groundingdino.models import build_model
-from grounding_dino.groundingdino.util.misc import clean_state_dict
-from grounding_dino.groundingdino.util.slconfig import SLConfig
-from grounding_dino.groundingdino.util.utils import get_phrases_from_posmap
+import groundingdino.datasets.transforms as T
+from groundingdino.models import build_model
+from groundingdino.util.misc import clean_state_dict
+from groundingdino.util.slconfig import SLConfig
+from groundingdino.util.utils import get_phrases_from_posmap
 
 # ----------------------------------------------------------------------------------------------------------------------
 # OLD API
@@ -48,7 +48,19 @@ def load_image(image_path: str) -> Tuple[np.array, torch.Tensor]:
     image = np.asarray(image_source)
     image_transformed, _ = transform(image_source, None)
     return image, image_transformed
-
+    
+def load_image_numpy(image_in: np.array) -> Tuple[np.array, torch.Tensor]:
+    transform = T.Compose(
+        [
+            T.RandomResize([800], max_size=1333),
+            T.ToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]
+    )
+    image_source = Image.fromarray(image_in, mode="RGB")
+    image = np.asarray(image_source)
+    image_transformed, _ = transform(image_source, None)
+    return image, image_transformed
 
 def predict(
         model,
