@@ -1,6 +1,7 @@
 #!/usr/bin/python3.10
 import torch
 import numpy as np
+import cv2
 from torchvision.ops import box_convert
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
@@ -19,12 +20,12 @@ class GS2_ROS_Wrapper():
         rospy.loginfo("Initializing Grounded SAM 2 ROS Wrapper")
         BASE_PATH = "/root/grounded_sam2/"
         # VERY important: text queries need to be lowercased + end with a dot
-        self.TEXT_PROMPT = "garbage. ball. bottle. food container. toy. table."
+        self.TEXT_PROMPT = "apple. banana. orange. lemon. candy. pitcher. can. mug. cup. plate. rubbish. garbage. table. chair. coffee. mustard. tube. bottle. tissues. cable. bowl. pear. banana. box. peach"
         SAM2_CHECKPOINT = BASE_PATH + "./checkpoints/sam2_hiera_large.pt"
         SAM2_MODEL_CONFIG = "sam2_hiera_l.yaml"
         GROUNDING_DINO_CONFIG = BASE_PATH + "grounding_dino/groundingdino/config/GroundingDINO_SwinT_OGC.py"
         GROUNDING_DINO_CHECKPOINT = BASE_PATH + "gdino_checkpoints/groundingdino_swint_ogc.pth"
-        self.BOX_THRESHOLD = 0.35
+        self.BOX_THRESHOLD = 0.3
         self.TEXT_THRESHOLD = 0.25
         print(f"{torch.cuda.is_available() = }")
         DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -55,7 +56,7 @@ class GS2_ROS_Wrapper():
             image = self.bridge.imgmsg_to_cv2(rgb, "rgb8")
         except CvBridgeError as e:
             print(e)
-
+        
         ros_detections = self.inference(image, rgb.header)
 
         if ros_detections.success:
@@ -64,6 +65,15 @@ class GS2_ROS_Wrapper():
             self.server.set_aborted(ros_detections)
 
     def inference(self, image, rgb_header):
+        scale = rospy.get_param("/gsam2/scale", 1)
+        do_sharpen = rospy.get_param("/gsam2/do_sharpen", False)
+        rospy.loginfo(f"GSam2 is using: {scale = }, {do_sharpen = }")
+        orig_shape = (image.shape[1], image.shape[0])
+        image = cv2.resize(image, (image.shape[1]*scale, image.shape[0]*scale))
+        if do_sharpen:
+            blurred = cv2.GaussianBlur(image, (9, 9), 10)
+            sharpened = cv2.addWeighted(image, 1.5, blurred, -0.5, 0)
+            image = sharpened
         results = self.inference_model_intern(image)  # predict on an image
         boxes, masks, class_names, confidences = results
         rospy.loginfo(f"{class_names  = }")
@@ -76,10 +86,10 @@ class GS2_ROS_Wrapper():
         for box, mask in zip(boxes, masks):
             bb = RegionOfInterest()
             # bb is in format [x1,y1,x2,y2] with (x1,y1) being the top left corner
-            xmin = int(box[0])
-            ymin = int(box[1])
-            xmax = int(box[2])
-            ymax = int(box[3])
+            xmin = int(box[0]/scale)
+            ymin = int(box[1]/scale)
+            xmax = int(box[2]/scale)
+            ymax = int(box[3]/scale)
             bb.x_offset = xmin
             bb.y_offset = ymin
             bb.height = ymax - ymin
@@ -93,6 +103,7 @@ class GS2_ROS_Wrapper():
 
         if len(class_names) > 0:
             rospy.loginfo(f"Found {len(class_names)} objects. Returning results")
+            label_image = cv2.resize(label_image, orig_shape)
             mask_image = self.bridge.cv2_to_imgmsg(label_image, encoding="16SC1", header=rgb_header)
             server_result = GenericImgProcAnnotatorResult()
             server_result.success = True
