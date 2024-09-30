@@ -27,6 +27,7 @@ class GS2_ROS_Wrapper():
         GROUNDING_DINO_CHECKPOINT = BASE_PATH + "gdino_checkpoints/groundingdino_swint_ogc.pth"
         self.BOX_THRESHOLD = 0.3
         self.TEXT_THRESHOLD = 0.25
+        self.AREA_THRESHOLD = 80 # minimum area of the bounding boxes in pixel^2
         print(f"{torch.cuda.is_available() = }")
         DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -75,15 +76,15 @@ class GS2_ROS_Wrapper():
             sharpened = cv2.addWeighted(image, 1.5, blurred, -0.5, 0)
             image = sharpened
         results = self.inference_model_intern(image)  # predict on an image
-        boxes, masks, class_names, confidences = results
-        rospy.loginfo(f"{class_names  = }")
-        rospy.loginfo(f"Found {len(results[2])} objects")
+        boxes, masks, class_names_, confidences_ = results
 
         height, width, channels = image.shape
-        bboxes_ros = []
-        label_image = np.full((height, width), -1, np.int16)
         idx = 0
-        for box, mask in zip(boxes, masks):
+        label_image = np.full((height, width), -1, np.int16)
+        bboxes_ros = []
+        class_names = []
+        confidences = []
+        for box, mask, class_name, confidence in zip(boxes, masks, class_names_, confidences_):
             bb = RegionOfInterest()
             # bb is in format [x1,y1,x2,y2] with (x1,y1) being the top left corner
             xmin = int(box[0]/scale)
@@ -95,11 +96,24 @@ class GS2_ROS_Wrapper():
             bb.height = ymax - ymin
             bb.width = xmax - xmin
             bb.do_rectify = False
-            bboxes_ros.append(bb)
             
+            if (bb.width * bb.height) < self.AREA_THRESHOLD:
+                rospy.loginfo(f"Skipping object {class_name} with area {bb.width * bb.height} since it is smaller than the threshold of {self.AREA_THRESHOLD}")
+                continue
+            
+            bboxes_ros.append(bb)
             label_image[mask > 0] = idx
-
+            class_names.append(class_name)
+            confidences.append(confidence)
+            
             idx += 1
+
+        assert len(bboxes_ros) == len(class_names)
+        assert len(bboxes_ros) == len(confidences)
+        assert np.unique(label_image).shape[0] - 1 == len(bboxes_ros)
+
+        rospy.loginfo(f"{class_names  = }")
+        rospy.loginfo(f"Found {len(class_names)} objects")
 
         if len(class_names) > 0:
             rospy.loginfo(f"Found {len(class_names)} objects. Returning results")
