@@ -20,7 +20,7 @@ class GS2_ROS_Wrapper():
         rospy.loginfo("Initializing Grounded SAM 2 ROS Wrapper")
         BASE_PATH = "/root/grounded_sam2/"
         # VERY important: text queries need to be lowercased + end with a dot
-        self.TEXT_PROMPT = "apple. banana. orange. lemon. candy. pitcher. can. mug. cup. plate. rubbish. garbage. table. chair. coffee. mustard. tube. bottle. tissues. cable. bowl. pear. banana. box. peach"
+        self.TEXT_PROMPT = "apple. banana. orange. lemon. candy. pitcher. can. mug. cup. plate. rubbish. garbage. table. chair. coffee. mustard. tube. bottle. tissues. cable. bowl. pear. banana. box. peach. fruit."
         SAM2_CHECKPOINT = BASE_PATH + "./checkpoints/sam2_hiera_large.pt"
         SAM2_MODEL_CONFIG = "sam2_hiera_l.yaml"
         GROUNDING_DINO_CONFIG = BASE_PATH + "grounding_dino/groundingdino/config/GroundingDINO_SwinT_OGC.py"
@@ -181,7 +181,8 @@ class GS2_ROS_Wrapper():
             for class_name, confidence
             in zip(class_names, confidences)
         ]
-        return input_boxes, masks, labels, confidences
+        rospy.loginfo(labels)
+        return input_boxes, masks, class_names, confidences
 
 if __name__ == "__main__":
 
