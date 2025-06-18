@@ -17,6 +17,7 @@ include_directories(
 
 catkin_install_python(PROGRAMS
   src/grounded_sam_2_ros.py
+  src/grounded_sam_2_ros_service.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

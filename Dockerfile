@@ -25,7 +25,6 @@ COPY . /home/appuser/Grounded-SAM-2/
 
 WORKDIR /home/appuser/Grounded-SAM-2
 
-
 # Install essential Python packages
 RUN python -m pip install --upgrade pip setuptools wheel numpy \
     opencv-python transformers supervision pycocotools addict yapf timm

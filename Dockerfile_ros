@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y \
 	python3-opencv ca-certificates python3-dev git wget sudo ninja-build
 RUN ln -sv /usr/bin/python3 /usr/bin/python
 
-RUN wget https://bootstrap.pypa.io/get-pip.py && \
-	python3 get-pip.py && \
+RUN wget https://bootstrap.pypa.io/pip/3.8/get-pip.py && \
+	python3 get-pip.py "pip<24.1" && \
 	rm get-pip.py
 
 # install lsb-release and curl
@@ -56,9 +56,8 @@ RUN mkdir -p /root/catkin_ws/src
 
 # clone and build message and service definitions
 RUN /bin/bash -c 'cd /root/catkin_ws/src; \
-                  git clone https://gitlab.informatik.uni-bremen.de/robokudo/robokudo_msgs.git'
+                  git clone https://github.com/v4r-tuwien/object_detector_msgs.git'
 RUN /bin/bash -c '. /opt/ros/noetic/setup.bash; cd /root/catkin_ws; catkin build'
-
 
 # install python3.10 for grounded sam
 RUN apt-get update && apt-get install -y software-properties-common \
@@ -69,18 +68,20 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
 RUN python3.10 -m pip install -U pip
 
 # install grounded dino requirements
-RUN python3.10 -m pip install "torch>=2.3.1" "torchvision>=0.18.1"
+RUN python3.10 -m pip install "torch==2.3.1" "torchvision>==0.18.1" "setuptools==68.2.0"
 ENV CUDA_HOME=/usr/local/cuda-12.1/
-RUN python3.10 -m pip install --upgrade pip setuptools wheel "numpy<2" \
+RUN python3.10 -m wheel "numpy<2" \
     opencv-python transformers supervision pycocotools addict yapf timm
 
 RUN mkdir -p /root/grounded_sam2
 COPY . /root/grounded_sam2
+# WORKDIR /root/grounded_sam2
 WORKDIR /root/grounded_sam2
 
+RUN python3.10 -m pip install setuptools==68.2.0
+# RUN python3.10 -m pip install torch==2.3.1
+# RUN python3.10 -m pip install torchvision==0.18.1
 RUN python3.10 -m pip install ./
 RUN python3.10 -m pip install --no-build-isolation -e grounding_dino
 
-COPY ./ros_wrapper /root/catkin_ws/src/grounded_sam_2
 RUN /bin/bash -c '. /opt/ros/noetic/setup.bash; cd /root/catkin_ws; catkin build'
-
